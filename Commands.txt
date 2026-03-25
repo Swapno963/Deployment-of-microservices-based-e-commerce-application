@@ -16,3 +16,55 @@ docker push swapno/payment-service:v1
 
 # Create Namespace
 sudo ./setup-namespace.sh 
+
+
+# Apply payment service
+kubectl apply -f payment-service-deployment.yaml
+
+# verify Payment Service
+# Check deployment status
+kubectl get deployments
+
+# Check pods
+kubectl get pods -l app=payment-service
+
+# Check service
+kubectl get svc payment-service
+
+# View detailed pod information
+kubectl describe deployment payment-service
+
+
+
+# Apply order service
+kubectl apply -f order-service-deployment.yaml
+
+# verify order service
+kubectl get pods -l app=order-service
+kubectl get svc order-service
+kubectl logs -l app=order-service --tail=20
+
+
+# Apply nginx configmap
+kubectl apply -f nginx-configmap.yaml
+
+# Verify
+kubectl get configmap nginx-config
+kubectl describe configmap nginx-config
+
+
+kubectl apply -f nginx-deployment.yaml
+Verify:
+
+kubectl get pods -l app=nginx
+kubectl get svc nginx
+kubectl logs -l app=nginx --tail=20
+
+
+
+Apply the loadbalancer configuration:
+
+kubectl apply -f loadbalancer-service.yaml
+Get external IP:
+
+kubectl get svc nginx-loadbalancer -w
