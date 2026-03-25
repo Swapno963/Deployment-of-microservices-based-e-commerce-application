@@ -30,7 +30,7 @@ def process_payment():
         "payment_id": payment_counter,
         "order_id": data.get("order_id"),
         "amount": data.get("amount"),
-        "status": "success" if random.random() > 0.1 else "failed",
+        "status": "success" if random.random() > 0.1 else "failed", 
         "transaction_id": f"TXN{payment_counter:06d}"
     }
     
