@@ -12,3 +12,7 @@ docker build -t swapno/payment-service:v1 .
 # Push images to registry (DockerHub, GCR, ECR, etc.)
 docker push swapno/order-service:v1
 docker push swapno/payment-service:v1
+
+
+# Create Namespace
+sudo ./setup-namespace.sh 
