@@ -1,11 +1,14 @@
+# Login to DockerHub
+docker login
+
 # Build Order Service image
 cd order-service
-docker build -t your-registry/order-service:v1 .
+docker build -t swapno/order-service:v1 .
 
 # Build Payment Service image
 cd ../payment-service
-docker build -t your-registry/payment-service:v1 .
+docker build -t swapno/payment-service:v1 .
 
 # Push images to registry (DockerHub, GCR, ECR, etc.)
-docker push your-registry/order-service:v1
-docker push your-registry/payment-service:v1
+docker push swapno/order-service:v1
+docker push swapno/payment-service:v1
