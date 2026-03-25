@@ -1,0 +1,21 @@
+# loadbalancer-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-loadbalancer
+  namespace: microservices-lab
+  labels:
+    app: nginx
+spec:
+  type: LoadBalancer
+  selector:
+    app: nginx
+  ports:
+  - protocol: TCP
+    port: 80        # External port
+    targetPort: 80  # NGINX container port
+    name: http
+  sessionAffinity: ClientIP  # Optional: maintains session consistency
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 10800
