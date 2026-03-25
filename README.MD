@@ -1,240 +1,168 @@
-# E-Commerce Microservices Deployment (Kubernetes)
 
-This project demonstrates how to deploy a **microservices-based e-commerce application** using Kubernetes. It includes multiple independent services, containerized with Docker and exposed via a reverse proxy.
+# E-Commerce Microservices Application Deployment
 
----
-
-## Architecture Overview
-
-The system consists of the following components:
-
-* **NGINX** → Reverse proxy & API Gateway
-* **Order Service** → Handles order creation and communication with payment service
-* **Payment Service** → Simulates payment processing
-* **Kubernetes LoadBalancer** → Exposes services externally
+This repository contains all the resources to deploy a **microservices-based e-commerce application** on Kubernetes. The application consists of multiple services orchestrated together, with **NGINX acting as a reverse proxy/API gateway**, and individual microservices handling orders and payments.
 
 ---
 
-## Microservices Description
-
-### 🔹 Order Service
-
-* Built using **Flask (Python)**
-* Provides REST API endpoints for order operations
-* Stores orders **in-memory**
-* Communicates with Payment Service via HTTP
-* Includes health check endpoints for Kubernetes probes
-* Runs on **port 5000**
-
-### 🔹 Payment Service
-
-* Independent Python service
-* Simulates payment processing with **random success/failure**
-* No dependency on other services
-* Runs on **port 5001**
-
----
-
-## Project Structure
+## Folder Structure
 
 ```
+
 .
 ├── Commands.txt
-├── setup-namespace.sh
+├── loadbalancer-service.yaml
+├── nginx-config.conf
+├── nginx-configmap.yaml
+├── nginx-deployment.yaml
 ├── order-service
 │   ├── Dockerfile
 │   ├── app.py
 │   └── requirements.txt
-└── payment-service
-    ├── Dockerfile
-    ├── app.py
-    └── requirements.txt
+├── order-service-deployment.yaml
+├── payment-service
+│   ├── Dockerfile
+│   ├── app.py
+│   └── requirements.txt
+├── payment-service-deployment.yaml
+├── setup-namespace.sh
+└── README.md
+
 ```
 
----
-
-## Prerequisites
-
-Make sure you have:
-
-* Docker installed
-* Kubernetes cluster (e.g., Minikube, K3s, EKS)
-* kubectl configured
-* Docker Hub account
+- **order-service/**: Python Flask service for handling orders.
+- **payment-service/**: Python Flask service for handling payment logic.
+- **nginx-config.conf**: NGINX configuration to route traffic to backend services.
+- **setup-namespace.sh**: Script to build/push Docker images and set up Kubernetes namespace.
+- **nginx-deployment.yaml**: Kubernetes deployment for NGINX pods.
+- **order-service-deployment.yaml** & **payment-service-deployment.yaml**: Kubernetes deployments for service pods.
+- **loadbalancer-service.yaml**: Exposes NGINX pods externally through a LoadBalancer.
 
 ---
 
-## Setup & Deployment
+## Services Overview
 
-### 1. Build & Push Docker Images
+### Order Service
+- Built with **Flask**, exposes REST API endpoints.
+- Stores orders in memory.
+- Communicates with Payment Service over HTTP.
+- Exposes a **health check** endpoint for Kubernetes probes.
+- Runs on port `5000`.
 
-The `setup-namespace.sh` script:
+### Payment Service
+- Independent Python service for payment processing.
+- Simulates payment success/failure randomly.
+- Runs on port `5001`.
+- No external dependencies on other services.
 
-* Builds Docker images for:
+### NGINX
+- Acts as **reverse proxy and API gateway**.
+- Routes requests to backend services.
+- Configuration highlights:
+  - `upstream` blocks define backend service pools.
+  - `proxy_pass` routes requests to backend.
+  - `location /api/orders` forwards requests to Order Service.
+  - `proxy_set_header` passes client information.
 
-  * Order Service
-  * Payment Service
-* Pushes images to Docker Hub
-* Creates a Kubernetes namespace
-* Sets it as the default namespace
+---
 
+## Kubernetes Components
+
+### Deployments
+- **Order & Payment Service Deployments**
+  - 2 replicas for redundancy.
+  - Defines CPU/memory requests and limits.
+  - **Liveness probe**: restarts pods on health failure.
+  - **Readiness probe**: ensures pod is ready before receiving traffic.
+  - **Service type**: ClusterIP (internal access only).
+
+- **NGINX Deployment**
+  - Mounts ConfigMap as `nginx.conf`.
+  - Exposed internally via ClusterIP; fronted by LoadBalancer.
+
+### Services
+- **LoadBalancer Service**
+  - Selects all pods with `app: nginx`.
+  - Exposes port `80` externally.
+  - Uses `sessionAffinity: ClientIP` to send the same client to the same pod when possible.
+
+---
+
+## Traffic Flow
+
+```
+
+User → LoadBalancer IP → Service → NGINX Pods → Backend Services (Order/Payment)
+
+````
+
+- Kubernetes load balances traffic across NGINX pods.
+- NGINX routes requests to the appropriate backend service based on configuration.
+
+---
+
+## Setup Instructions
+
+### Prerequisites
+- Docker installed
+- Kubernetes cluster (e.g., minikube, k3s, or cloud provider)
+- kubectl configured
+- DockerHub account (or another container registry)
+
+### Step 1: Build & Push Service Images
 ```bash
-chmod +x setup-namespace.sh
 ./setup-namespace.sh
-```
+````
 
----
+This script will:
 
-### 2. Deploy Services to Kubernetes
+* Build Docker images for order-service and payment-service.
+* Push images to DockerHub.
+* Create a Kubernetes namespace for logical separation.
 
-Apply your Kubernetes manifests:
-
-```bash
-kubectl apply -f k8s/
-```
-
-*(Assumes you have YAML files for deployments and services in `k8s/` directory)*
-
----
-
-### 3. Verify Deployment
-
-Check pods:
+### Step 2: Deploy Backend Services
 
 ```bash
-kubectl get pods
+kubectl apply -f order-service-deployment.yaml
+kubectl apply -f payment-service-deployment.yaml
 ```
 
-Check services:
+### Step 3: Deploy NGINX
 
 ```bash
-kubectl get svc
+kubectl apply -f nginx-configmap.yaml
+kubectl apply -f nginx-deployment.yaml
 ```
 
----
-
-### 4. Access the Application
-
-If using LoadBalancer:
+### Step 4: Deploy LoadBalancer
 
 ```bash
-kubectl get svc
+kubectl apply -f loadbalancer-service.yaml
 ```
 
-Get the external IP and access via browser or curl:
+### Step 5: Verify Deployment
 
 ```bash
-curl http://<EXTERNAL-IP>/orders
+kubectl get all -n <your-namespace>
 ```
 
----
+* Ensure all pods are `Running` and services are correctly exposed.
 
-## Request Flow
+### Step 6: Test Application
 
-1. Client sends request to **NGINX**
-2. NGINX routes request to **Order Service**
-3. Order Service:
-
-   * Creates order
-   * Calls **Payment Service**
-4. Payment Service:
-
-   * Simulates success/failure
-5. Response flows back to client
+* Access the application through the LoadBalancer IP on port `80`.
+* Use `/api/orders` endpoint to interact with the Order Service.
 
 ---
 
-## Health Checks
+## Notes
 
-Both services expose endpoints for Kubernetes probes:
-
-* Liveness Probe → ensures container is running
-* Readiness Probe → ensures service is ready to receive traffic
-
----
-
-## Important Notes (Production vs Learning)
-
-###  What Juniors Often Assume
-
-* In-memory storage is acceptable
-* Service-to-service HTTP is always reliable
-* LoadBalancer = production-ready exposure
-* No need for retries or timeouts
-
-### What Experienced Engineers Know
-
-* **State must be externalized** → use databases (PostgreSQL, Redis)
-* **Network calls fail frequently** → implement:
-
-  * retries
-  * circuit breakers
-  * timeouts
-* **Observability is critical**:
-
-  * logging (ELK / Loki)
-  * metrics (Prometheus)
-  * tracing (Jaeger)
-* **NGINX is not a full API gateway** → consider:
-
-  * rate limiting
-  * auth
-  * service mesh (Istio / Linkerd)
-* **LoadBalancer alone is not secure**:
-
-  * TLS termination
-  * WAF
-  * proper ingress controller
+* Order Service stores data **in memory**, so all orders are lost when pods restart.
+* Payment Service randomly simulates success/failure; suitable for testing communication between services.
+* For production, consider using persistent storage and real payment integration.
 
 ---
 
-## Future Improvements
+This setup demonstrates **Kubernetes microservice orchestration** with **internal services, health checks, and external exposure via LoadBalancer**, while keeping deployments simple for local or cloud testing.
 
-* Add persistent database for orders
-* Introduce message queue (Kafka/RabbitMQ) for async processing
-* Implement retry & circuit breaker logic
-* Add CI/CD pipeline
-* Use Helm for Kubernetes packaging
-* Introduce service mesh for advanced traffic control
 
----
-
-## 🧪 Example API Endpoints
-
-### Create Order
-
-```bash
-POST /orders
-```
-
-### Health Check
-
-```bash
-GET /health
-```
-
----
-
-## 🧹 Cleanup
-
-To delete resources:
-
-```bash
-kubectl delete namespace microservices-lab
-```
-
----
-
-## 📚 Summary
-
-This project demonstrates:
-
-* Microservices architecture basics
-* Docker containerization
-* Kubernetes deployment
-* Service-to-service communication
-* Reverse proxy usage with NGINX
-
-It serves as a strong foundation for moving toward **production-grade distributed systems**.
-
----
